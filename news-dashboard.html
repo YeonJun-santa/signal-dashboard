@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIGNAL — 글로벌 인텔리전스 대시보드</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Noto+Sans+KR:wght@300;400;500;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #060810;
+    --panel: #0b0f1a;
+    --panel2: #0f1420;
+    --border: #1a2035;
+    --accent: #00e5ff;
+    --accent2: #ff3d71;
+    --accent3: #a8ff3e;
+    --accent4: #ffaa00;
+    --text: #c8d4e8;
+    --text-dim: #4a5568;
+    --text-bright: #eef2ff;
+    --live: #ff3d71;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 13px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,229,255,0.015) 2px, rgba(0,229,255,0.015) 4px);
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 100;
+  }
+
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    letter-spacing: 6px;
+    color: var(--accent);
+    text-shadow: 0 0 20px rgba(0,229,255,0.5);
+  }
+
+  .logo span { color: var(--accent2); }
+
+  .header-meta {
+    display: flex; align-items: center; gap: 20px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .live-badge {
+    display: flex; align-items: center; gap: 5px;
+    color: var(--live);
+    font-weight: 700;
+    font-size: 10px;
+    letter-spacing: 2px;
+  }
+
+  .live-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--live);
+    animation: pulse 1.2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
+  }
+
+  .clock { color: var(--accent); letter-spacing: 1px; }
+
+  /* Tag filters */
+  .tag-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 20px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+
+  .tag-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    white-space: nowrap;
+  }
+
+  .tag {
+    padding: 3px 10px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    font-size: 11px;
+    font-family: 'Space Mono', monospace;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+    background: transparent;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+
+  .tag.active, .tag:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(0,229,255,0.07);
+    text-shadow: 0 0 8px rgba(0,229,255,0.4);
+  }
+
+  .tag.active.ai { border-color: var(--accent3); color: var(--accent3); background: rgba(168,255,62,0.07); }
+  .tag.active.biz { border-color: var(--accent4); color: var(--accent4); background: rgba(255,170,0,0.07); }
+  .tag.active.sv { border-color: var(--accent); color: var(--accent); background: rgba(0,229,255,0.07); }
+
+  /* Main grid */
+  .main {
+    display: grid;
+    grid-template-columns: 280px 1fr 240px;
+    grid-template-rows: auto;
+    gap: 1px;
+    background: var(--border);
+    min-height: calc(100vh - 95px);
+  }
+
+  .panel {
+    background: var(--panel);
+    padding: 14px;
+    overflow: hidden;
+  }
+
+  .panel-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .panel-title .count {
+    background: var(--border);
+    padding: 1px 6px;
+    border-radius: 2px;
+    font-size: 10px;
+    color: var(--accent);
+  }
+
+  /* Left: source list */
+  .source-list { display: flex; flex-direction: column; gap: 2px; }
+
+  .source-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background 0.15s;
+    border: 1px solid transparent;
+  }
+
+  .source-item:hover { background: var(--panel2); border-color: var(--border); }
+  .source-item.active { background: rgba(0,229,255,0.06); border-color: rgba(0,229,255,0.2); }
+
+  .source-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .source-name {
+    flex: 1;
+    font-size: 12px;
+    color: var(--text);
+  }
+
+  .source-tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 1px;
+    letter-spacing: 1px;
+  }
+
+  /* Center: news feed */
+  .center-panel {
+    background: var(--panel);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .feed-controls {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+
+  .view-btn {
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-radius: 2px;
+  }
+
+  .view-btn.active, .view-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(0,229,255,0.06);
+  }
+
+  .search-box {
+    flex: 1;
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 4px 10px;
+    font-size: 12px;
+    font-family: 'Noto Sans KR', sans-serif;
+    border-radius: 2px;
+    outline: none;
+    min-width: 120px;
+  }
+
+  .search-box:focus { border-color: var(--accent); }
+  .search-box::placeholder { color: var(--text-dim); }
+
+  .refresh-btn {
+    padding: 4px 12px;
+    background: rgba(0,229,255,0.1);
+    border: 1px solid rgba(0,229,255,0.3);
+    color: var(--accent);
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.2s;
+  }
+
+  .refresh-btn:hover { background: rgba(0,229,255,0.2); }
+  .refresh-btn.loading { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* News cards */
+  .news-feed {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .news-feed::-webkit-scrollbar { width: 4px; }
+  .news-feed::-webkit-scrollbar-track { background: transparent; }
+  .news-feed::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .news-card {
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-left: 3px solid transparent;
+    padding: 10px 12px;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.2s;
+    animation: fadeSlide 0.4s ease both;
+  }
+
+  @keyframes fadeSlide {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .news-card:hover {
+    border-color: var(--border);
+    background: #141826;
+    transform: translateX(2px);
+  }
+
+  .news-card.ai { border-left-color: var(--accent3); }
+  .news-card.biz { border-left-color: var(--accent4); }
+  .news-card.sv { border-left-color: var(--accent); }
+  .news-card.global { border-left-color: var(--accent2); }
+
+  .card-meta {
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: 5px;
+    flex-wrap: wrap;
+  }
+
+  .card-source {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+  }
+
+  .card-cat {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 1px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .cat-ai { background: rgba(168,255,62,0.12); color: var(--accent3); }
+  .cat-biz { background: rgba(255,170,0,0.12); color: var(--accent4); }
+  .cat-sv { background: rgba(0,229,255,0.12); color: var(--accent); }
+  .cat-global { background: rgba(255,61,113,0.12); color: var(--accent2); }
+  .cat-ax { background: rgba(180,130,255,0.12); color: #c084fc; }
+
+  .card-time {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    margin-left: auto;
+  }
+
+  .card-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-bright);
+    line-height: 1.45;
+    margin-bottom: 4px;
+  }
+
+  .card-summary {
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .card-footer {
+    display: flex; align-items: center; gap: 6px;
+    margin-top: 7px;
+  }
+
+  .card-signal {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 1px;
+    letter-spacing: 1px;
+  }
+
+  .signal-high { background: rgba(168,255,62,0.12); color: var(--accent3); border: 1px solid rgba(168,255,62,0.2); }
+  .signal-mid { background: rgba(255,170,0,0.12); color: var(--accent4); border: 1px solid rgba(255,170,0,0.2); }
+  .signal-low { background: rgba(74,85,104,0.3); color: var(--text-dim); border: 1px solid var(--border); }
+
+  .card-link {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    text-decoration: none;
+    letter-spacing: 1px;
+    transition: color 0.2s;
+  }
+
+  .card-link:hover { color: var(--accent); }
+
+  /* Right: stats panel */
+  .right-panel { display: flex; flex-direction: column; gap: 1px; }
+
+  .mini-panel {
+    background: var(--panel);
+    padding: 12px 14px;
+  }
+
+  .stat-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .stat-row:last-child { border-bottom: none; }
+
+  .stat-label {
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .stat-val {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    color: var(--text-bright);
+  }
+
+  .stat-val.up { color: var(--accent3); }
+  .stat-val.down { color: var(--accent2); }
+
+  /* Trend bar */
+  .trend-bar {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 0;
+  }
+
+  .trend-label { font-size: 11px; color: var(--text); flex: 1; }
+
+  .trend-track {
+    width: 70px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .trend-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 1s ease;
+  }
+
+  .trend-pct {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    width: 30px;
+    text-align: right;
+  }
+
+  /* Alert box */
+  .alert-box {
+    border: 1px solid rgba(255,61,113,0.3);
+    background: rgba(255,61,113,0.05);
+    padding: 8px 10px;
+    border-radius: 2px;
+    margin-bottom: 6px;
+    animation: fadeSlide 0.5s ease;
+  }
+
+  .alert-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--accent2);
+    letter-spacing: 2px;
+    margin-bottom: 3px;
+  }
+
+  .alert-text { font-size: 11px; color: var(--text); line-height: 1.4; }
+
+  /* Keyword cloud */
+  .keyword-cloud {
+    display: flex; flex-wrap: wrap; gap: 5px;
+    padding: 4px 0;
+  }
+
+  .kw {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    padding: 2px 7px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .kw:hover, .kw.active { border-color: var(--accent); color: var(--accent); background: rgba(0,229,255,0.06); }
+  .kw.hot { border-color: rgba(168,255,62,0.3); color: var(--accent3); font-size: 11px; }
+
+  /* Bottom ticker */
+  .ticker {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    padding: 6px 0;
+    overflow: hidden;
+    z-index: 100;
+  }
+
+  .ticker-inner {
+    display: flex;
+    animation: ticker 60s linear infinite;
+    white-space: nowrap;
+  }
+
+  @keyframes ticker {
+    from { transform: translateX(100vw); }
+    to { transform: translateX(-100%); }
+  }
+
+  .ticker-item {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 0 24px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .ticker-item .sep { color: var(--border); }
+  .ticker-item .hl { color: var(--accent); }
+  .ticker-item .hl2 { color: var(--accent3); }
+
+  .loading-state {
+    display: flex; align-items: center; justify-content: center;
+    padding: 40px;
+    flex-direction: column; gap: 12px;
+    color: var(--text-dim);
+  }
+
+  .loading-spinner {
+    width: 30px; height: 30px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  .loading-text {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+  }
+
+  .error-state {
+    padding: 20px;
+    text-align: center;
+    color: var(--accent2);
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+  }
+
+  .empty-state {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 12px;
+  }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .main { grid-template-columns: 1fr; }
+    .left-panel, .right-panel { display: none; }
+  }
+
+  pb { padding-bottom: 40px; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div style="display:flex;align-items:center;gap:16px">
+    <div class="logo">SIG<span>NAL</span></div>
+    <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+  </div>
+  <div class="header-meta">
+    <span>글로벌 신사업 인텔리전스</span>
+    <span class="clock" id="clock">--:--:--</span>
+    <span id="last-update" style="font-size:10px">갱신 대기중</span>
+  </div>
+</div>
+
+<!-- Tag bar -->
+<div class="tag-bar">
+  <span class="tag-label">FILTER:</span>
+  <span class="tag active" onclick="filterTag('all', this)">ALL</span>
+  <span class="tag ai" onclick="filterTag('ai', this)">#AI</span>
+  <span class="tag biz" onclick="filterTag('biz', this)">#비즈니스</span>
+  <span class="tag sv" onclick="filterTag('sv', this)">#실리콘밸리</span>
+  <span class="tag" onclick="filterTag('ax', this)">#AX</span>
+  <span class="tag" onclick="filterTag('global', this)">#글로벌</span>
+  <span class="tag" onclick="filterTag('혁신', this)">#혁신</span>
+  <span class="tag" onclick="filterTag('startup', this)">#스타트업</span>
+</div>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- LEFT: Sources -->
+  <div class="panel left-panel">
+    <div class="panel-title">
+      SOURCES
+      <span class="count" id="source-count">0</span>
+    </div>
+    <div class="source-list" id="source-list">
+      <!-- populated by JS -->
+    </div>
+
+    <div style="margin-top:16px">
+      <div class="panel-title">KEYWORDS <span class="count">TRENDING</span></div>
+      <div class="keyword-cloud" id="kw-cloud"></div>
+    </div>
+  </div>
+
+  <!-- CENTER: Feed -->
+  <div class="center-panel">
+    <div class="feed-controls">
+      <button class="view-btn active" onclick="setSort('latest', this)">최신순</button>
+      <button class="view-btn" onclick="setSort('signal', this)">신호강도</button>
+      <button class="view-btn" onclick="setSort('source', this)">소스별</button>
+      <input class="search-box" id="search-input" placeholder="키워드 검색..." oninput="searchNews(this.value)">
+      <button class="refresh-btn" id="refresh-btn" onclick="loadAllFeeds()">⟳ 새로고침</button>
+    </div>
+
+    <div class="news-feed" id="news-feed">
+      <div class="loading-state">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">FETCHING SIGNALS...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Stats -->
+  <div class="right-panel">
+    <div class="mini-panel">
+      <div class="panel-title">SIGNAL STATS</div>
+      <div class="stat-row">
+        <span class="stat-label">수집 기사</span>
+        <span class="stat-val" id="stat-total">0</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">고신호 항목</span>
+        <span class="stat-val up" id="stat-high">0</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">AI 관련</span>
+        <span class="stat-val" id="stat-ai">0</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">비즈니스</span>
+        <span class="stat-val" id="stat-biz">0</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">실리콘밸리</span>
+        <span class="stat-val" id="stat-sv">0</span>
+      </div>
+    </div>
+
+    <div class="mini-panel">
+      <div class="panel-title">카테고리 비중</div>
+      <div id="trend-bars"></div>
+    </div>
+
+    <div class="mini-panel">
+      <div class="panel-title">⚡ 주목 신호</div>
+      <div id="alert-container"></div>
+    </div>
+
+    <div class="mini-panel" style="flex:1">
+      <div class="panel-title">RSS 소스 추가</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <input id="rss-input" class="search-box" placeholder="RSS URL 입력..." style="width:100%">
+        <input id="rss-name" class="search-box" placeholder="소스 이름..." style="width:100%">
+        <button class="refresh-btn" style="width:100%" onclick="addCustomSource()">+ 추가</button>
+      </div>
+      <div style="margin-top:10px;font-size:10px;color:var(--text-dim);font-family:'Space Mono',monospace;line-height:1.7">
+        예시 RSS:<br>
+        techcrunch.com/feed<br>
+        feeds.arstechnica.com/arstechnica/index<br>
+        geek.news/feed
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Ticker -->
+<div class="ticker">
+  <div class="ticker-inner" id="ticker-inner">
+    <span class="ticker-item">
+      <span class="hl">SIGNAL</span> <span class="sep">—</span> 글로벌 신사업 인텔리전스 대시보드 <span class="sep">|</span>
+      <span class="hl2">#AI</span> <span class="sep">·</span> <span class="hl2">#비즈니스</span> <span class="sep">·</span> <span class="hl2">#실리콘밸리</span> <span class="sep">·</span> <span class="hl2">#혁신</span> <span class="sep">·</span> <span class="hl2">#AX</span> <span class="sep">·</span> <span class="hl2">#글로벌</span>
+      <span class="sep">—</span> RSS 피드 실시간 수집 중...
+    </span>
+  </div>
+</div>
+
+<script>
+// ─── DATA ───────────────────────────────────────────────────
+const SOURCES = [
+  { name: 'TechCrunch', url: 'https://techcrunch.com/feed/', color: '#00e5ff', tags: ['sv','ai','startup'], cat: 'SV' },
+  { name: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/index', color: '#a8ff3e', tags: ['ai','tech'], cat: 'AI' },
+  { name: 'Hacker News', url: 'https://news.ycombinator.com/rss', color: '#ffaa00', tags: ['sv','startup','biz'], cat: 'BIZ' },
+  { name: 'VentureBeat AI', url: 'https://venturebeat.com/feed/', color: '#a8ff3e', tags: ['ai','ax'], cat: 'AI' },
+  { name: 'MIT Tech Review', url: 'https://www.technologyreview.com/feed/', color: '#c084fc', tags: ['ai','혁신'], cat: 'AI' },
+  { name: 'GeekNews (KR)', url: 'https://feeds.feedburner.com/geeknews', color: '#ff3d71', tags: ['sv','ai','startup'], cat: 'SV' },
+  { name: 'Wired', url: 'https://www.wired.com/feed/rss', color: '#ffaa00', tags: ['ai','biz','혁신'], cat: 'BIZ' },
+  { name: 'The Verge', url: 'https://www.theverge.com/rss/index.xml', color: '#00e5ff', tags: ['ai','tech','sv'], cat: 'SV' },
+];
+
+const AI_KEYWORDS = ['AI', 'LLM', 'GPT', 'Claude', 'Gemini', 'OpenAI', 'Anthropic', 'AGI', 'machine learning', '인공지능', 'model', 'inference', 'Llama'];
+const BIZ_KEYWORDS = ['startup', 'funding', 'IPO', 'acquisition', 'revenue', 'valuation', 'Series', 'venture', '투자', '비즈니스', 'market', 'growth'];
+const SV_KEYWORDS = ['Silicon Valley', 'San Francisco', 'Google', 'Apple', 'Meta', 'Microsoft', 'Amazon', 'Tesla', 'Y Combinator', 'a16z'];
+const AX_KEYWORDS = ['automation', 'AX', 'enterprise AI', 'digital transformation', '디지털전환', 'workflow', 'productivity'];
+
+const RSS_PROXY = 'https://api.rss2json.com/v1/api.json?rss_url=';
+
+let allArticles = [];
+let filteredArticles = [];
+let currentTag = 'all';
+let currentSort = 'latest';
+let customSources = [];
+
+// ─── INIT ────────────────────────────────────────────────────
+window.onload = () => {
+  updateClock();
+  setInterval(updateClock, 1000);
+  renderSources();
+  loadAllFeeds();
+  setInterval(loadAllFeeds, 5 * 60 * 1000); // auto-refresh every 5 min
+};
+
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toLocaleTimeString('ko-KR', { hour12: false });
+}
+
+// ─── SOURCES ─────────────────────────────────────────────────
+function renderSources() {
+  const all = [...SOURCES, ...customSources];
+  document.getElementById('source-count').textContent = all.length;
+  document.getElementById('source-list').innerHTML = all.map((s, i) => `
+    <div class="source-item active" onclick="toggleSource(${i}, this)">
+      <div class="source-dot" style="background:${s.color}"></div>
+      <span class="source-name">${s.name}</span>
+      <span class="source-tag cat-${s.cat.toLowerCase()}">${s.cat}</span>
+    </div>
+  `).join('');
+}
+
+// ─── FEED LOADING ─────────────────────────────────────────────
+async function loadAllFeeds() {
+  const btn = document.getElementById('refresh-btn');
+  btn.textContent = '⟳ 로딩중...';
+  btn.classList.add('loading');
+
+  const feed = document.getElementById('news-feed');
+  feed.innerHTML = `<div class="loading-state">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">FETCHING SIGNALS...</div>
+  </div>`;
+
+  allArticles = [];
+  const all = [...SOURCES, ...customSources];
+  const promises = all.map(s => fetchFeed(s));
+  const results = await Promise.allSettled(promises);
+
+  results.forEach((r, i) => {
+    if (r.status === 'fulfilled' && r.value) {
+      allArticles.push(...r.value);
+    }
+  });
+
+  // Sort by date desc
+  allArticles.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+
+  updateStats();
+  applyFilter();
+  renderKeywords();
+  renderAlerts();
+  updateTicker();
+
+  btn.textContent = '⟳ 새로고침';
+  btn.classList.remove('loading');
+
+  const now = new Date();
+  document.getElementById('last-update').textContent =
+    `갱신: ${now.toLocaleTimeString('ko-KR', { hour12: false })}`;
+}
+
+async function fetchFeed(source) {
+  try {
+    const res = await fetch(`${RSS_PROXY}${encodeURIComponent(source.url)}&count=20`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data.items) return null;
+
+    return data.items.map(item => ({
+      title: item.title || '',
+      summary: stripHtml(item.description || item.content || ''),
+      link: item.link || '#',
+      pubDate: item.pubDate || new Date().toISOString(),
+      source: source.name,
+      sourceColor: source.color,
+      cat: detectCat(item.title + ' ' + (item.description || '')),
+      signal: detectSignal(item.title + ' ' + (item.description || '')),
+      tags: detectTags(item.title + ' ' + (item.description || '')),
+    }));
+  } catch (e) {
+    return null;
+  }
+}
+
+function stripHtml(html) {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  return (tmp.textContent || tmp.innerText || '').slice(0, 200).trim();
+}
+
+function detectCat(text) {
+  const t = text.toLowerCase();
+  if (AI_KEYWORDS.some(k => t.includes(k.toLowerCase()))) return 'ai';
+  if (AX_KEYWORDS.some(k => t.includes(k.toLowerCase()))) return 'ax';
+  if (SV_KEYWORDS.some(k => t.includes(k.toLowerCase()))) return 'sv';
+  if (BIZ_KEYWORDS.some(k => t.includes(k.toLowerCase()))) return 'biz';
+  return 'global';
+}
+
+function detectTags(text) {
+  const t = text.toLowerCase();
+  const tags = [];
+  if (AI_KEYWORDS.some(k => t.includes(k.toLowerCase()))) tags.push('ai');
+  if (BIZ_KEYWORDS.some(k => t.includes(k.toLowerCase()))) tags.push('biz');
+  if (SV_KEYWORDS.some(k => t.includes(k.toLowerCase()))) tags.push('sv');
+  if (AX_KEYWORDS.some(k => t.includes(k.toLowerCase()))) tags.push('ax');
+  return tags;
+}
+
+function detectSignal(text) {
+  const highKw = ['raises', 'launches', 'acquires', 'billion', 'breakthrough', 'AGI', 'IPO', 'Series C', 'Series D', '공개', '출시', '혁신', 'new model'];
+  const midKw = ['funding', 'update', 'partnership', 'announces', 'million', '투자', '협력'];
+  const t = text.toLowerCase();
+  if (highKw.some(k => t.includes(k.toLowerCase()))) return 'high';
+  if (midKw.some(k => t.includes(k.toLowerCase()))) return 'mid';
+  return 'low';
+}
+
+// ─── RENDER ───────────────────────────────────────────────────
+function renderFeed(articles) {
+  const feed = document.getElementById('news-feed');
+
+  if (!articles.length) {
+    feed.innerHTML = `<div class="empty-state">해당 조건의 기사가 없습니다.<br>새로고침하거나 필터를 변경해보세요.</div>`;
+    return;
+  }
+
+  const catLabel = { ai: 'AI', biz: 'BIZ', sv: 'SV', ax: 'AX', global: 'GLOBAL' };
+  const signalLabel = { high: '⬆ HIGH SIGNAL', mid: '— MID', low: '↓ LOW' };
+
+  feed.innerHTML = articles.map((a, i) => {
+    const timeAgo = getTimeAgo(a.pubDate);
+    return `
+    <div class="news-card ${a.cat}" style="animation-delay:${Math.min(i * 0.03, 0.5)}s" onclick="openLink('${a.link}')">
+      <div class="card-meta">
+        <span class="card-source">${a.source}</span>
+        <span class="card-cat cat-${a.cat}">${catLabel[a.cat] || a.cat.toUpperCase()}</span>
+        <span class="card-time">${timeAgo}</span>
+      </div>
+      <div class="card-title">${a.title}</div>
+      ${a.summary ? `<div class="card-summary">${a.summary}</div>` : ''}
+      <div class="card-footer">
+        <span class="card-signal signal-${a.signal}">${signalLabel[a.signal]}</span>
+        <a href="${a.link}" class="card-link" target="_blank" onclick="event.stopPropagation()">원문 →</a>
+      </div>
+    </div>
+    `;
+  }).join('');
+}
+
+function openLink(url) {
+  if (url && url !== '#') window.open(url, '_blank');
+}
+
+function getTimeAgo(dateStr) {
+  const now = new Date();
+  const then = new Date(dateStr);
+  const diff = (now - then) / 1000;
+  if (diff < 60) return `${Math.floor(diff)}초 전`;
+  if (diff < 3600) return `${Math.floor(diff/60)}분 전`;
+  if (diff < 86400) return `${Math.floor(diff/3600)}시간 전`;
+  return `${Math.floor(diff/86400)}일 전`;
+}
+
+// ─── FILTERS & SORT ───────────────────────────────────────────
+function filterTag(tag, el) {
+  document.querySelectorAll('.tag').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  currentTag = tag;
+  applyFilter();
+}
+
+function setSort(sort, el) {
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  currentSort = sort;
+  applyFilter();
+}
+
+function searchNews(query) {
+  applyFilter(query);
+}
+
+function applyFilter(query) {
+  if (query === undefined) query = document.getElementById('search-input').value;
+  const q = query.toLowerCase().trim();
+
+  filteredArticles = allArticles.filter(a => {
+    const tagMatch = currentTag === 'all' || a.cat === currentTag || a.tags.includes(currentTag);
+    const queryMatch = !q || a.title.toLowerCase().includes(q) || a.summary.toLowerCase().includes(q) || a.source.toLowerCase().includes(q);
+    return tagMatch && queryMatch;
+  });
+
+  if (currentSort === 'signal') {
+    const order = { high: 0, mid: 1, low: 2 };
+    filteredArticles.sort((a, b) => order[a.signal] - order[b.signal]);
+  } else if (currentSort === 'source') {
+    filteredArticles.sort((a, b) => a.source.localeCompare(b.source));
+  }
+
+  renderFeed(filteredArticles);
+}
+
+// ─── STATS ────────────────────────────────────────────────────
+function updateStats() {
+  document.getElementById('stat-total').textContent = allArticles.length;
+  document.getElementById('stat-high').textContent = allArticles.filter(a => a.signal === 'high').length;
+  document.getElementById('stat-ai').textContent = allArticles.filter(a => a.cat === 'ai').length;
+  document.getElementById('stat-biz').textContent = allArticles.filter(a => a.cat === 'biz').length;
+  document.getElementById('stat-sv').textContent = allArticles.filter(a => a.cat === 'sv').length;
+
+  const total = allArticles.length || 1;
+  const cats = ['ai', 'biz', 'sv', 'ax', 'global'];
+  const colors = { ai: '#a8ff3e', biz: '#ffaa00', sv: '#00e5ff', ax: '#c084fc', global: '#ff3d71' };
+  const labels = { ai: 'AI', biz: 'BIZ', sv: 'SV', ax: 'AX', global: 'GLOBAL' };
+
+  document.getElementById('trend-bars').innerHTML = cats.map(cat => {
+    const cnt = allArticles.filter(a => a.cat === cat).length;
+    const pct = Math.round((cnt / total) * 100);
+    return `<div class="trend-bar">
+      <span class="trend-label">${labels[cat]}</span>
+      <div class="trend-track"><div class="trend-fill" style="width:${pct}%;background:${colors[cat]}"></div></div>
+      <span class="trend-pct">${pct}%</span>
+    </div>`;
+  }).join('');
+}
+
+// ─── KEYWORDS ─────────────────────────────────────────────────
+function renderKeywords() {
+  const wordMap = {};
+  allArticles.forEach(a => {
+    const words = a.title.split(/\s+/);
+    words.forEach(w => {
+      const cleaned = w.replace(/[^a-zA-Z0-9가-힣]/g, '');
+      if (cleaned.length > 3 && !/^(the|and|for|with|that|this|from|have|will|your|are|was|not|but|been|has|its|new|our)$/i.test(cleaned)) {
+        wordMap[cleaned] = (wordMap[cleaned] || 0) + 1;
+      }
+    });
+  });
+
+  const sorted = Object.entries(wordMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20);
+
+  const maxCount = sorted[0]?.[1] || 1;
+  document.getElementById('kw-cloud').innerHTML = sorted.map(([w, cnt]) => {
+    const isHot = cnt >= maxCount * 0.5;
+    return `<span class="kw ${isHot ? 'hot' : ''}" onclick="document.getElementById('search-input').value='${w}';searchNews('${w}')">${w}</span>`;
+  }).join('');
+}
+
+// ─── ALERTS ───────────────────────────────────────────────────
+function renderAlerts() {
+  const highSignals = allArticles.filter(a => a.signal === 'high').slice(0, 3);
+  const container = document.getElementById('alert-container');
+
+  if (!highSignals.length) {
+    container.innerHTML = `<div style="font-size:11px;color:var(--text-dim);font-family:'Space Mono',monospace">고신호 항목 없음</div>`;
+    return;
+  }
+
+  container.innerHTML = highSignals.map(a => `
+    <div class="alert-box" onclick="openLink('${a.link}')" style="cursor:pointer">
+      <div class="alert-title">⬆ HIGH SIGNAL — ${a.source}</div>
+      <div class="alert-text">${a.title.slice(0, 80)}${a.title.length > 80 ? '...' : ''}</div>
+    </div>
+  `).join('');
+}
+
+// ─── TICKER ───────────────────────────────────────────────────
+function updateTicker() {
+  const items = allArticles.filter(a => a.signal === 'high').slice(0, 10);
+  if (!items.length) return;
+
+  const tickerContent = items.map(a =>
+    `<span class="ticker-item"><span class="hl">${a.source}</span> <span class="sep">—</span> ${a.title.slice(0, 70)} <span class="sep">|</span></span>`
+  ).join('');
+
+  document.getElementById('ticker-inner').innerHTML = tickerContent + tickerContent;
+}
+
+// ─── CUSTOM SOURCE ────────────────────────────────────────────
+function addCustomSource() {
+  const url = document.getElementById('rss-input').value.trim();
+  const name = document.getElementById('rss-name').value.trim();
+  if (!url || !name) {
+    alert('URL과 이름을 모두 입력해주세요.');
+    return;
+  }
+
+  const fullUrl = url.startsWith('http') ? url : 'https://' + url;
+  customSources.push({
+    name, url: fullUrl,
+    color: '#c084fc',
+    tags: ['global'], cat: 'GLOBAL'
+  });
+
+  document.getElementById('rss-input').value = '';
+  document.getElementById('rss-name').value = '';
+
+  renderSources();
+  loadAllFeeds();
+}
+
+function toggleSource(i, el) {
+  el.classList.toggle('active');
+}
+</script>
+
+</body>
+</html>
